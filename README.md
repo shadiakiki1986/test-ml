@@ -18,8 +18,14 @@ Testing some ML.
   - if modified to use the PCA without dimensionality reduction, will show that the "0" signal affects the AE result
   - not very useful though, so just skip
 
-3. `t1c_pca_ae_nonlinear.ipynb`
+3. `t1c_pca_ae_linear.ipynb`
   - same as `t1a...`, but with an added signal being a superposition of 2 sine waves
     - both of which are already in the input
   - demonstrates that AE without PCA is worse than AE with PCA
   - also demonstrates that the PCA-AE combination is better than PCA alone
+
+4. `t1d_pca_ae_nonlinear.ipynb`
+  - as `t1c` but with added signal being `sin1*sin2` instead of `sin1+sin2`
+  - demonstrates that AE works the same with and without PCA
+  - pending feedback from community / gabriel at my [SE/stats](https://stats.stackexchange.com/questions/292181/does-pca-ahead-of-an-autoencoder-deter-it-from-detecting-non-linearity) post
+
