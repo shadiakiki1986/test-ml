@@ -21,10 +21,9 @@ from keras.layers import Input, Dense, Dropout
 from keras.models import Model, load_model
 from keras.layers.advanced_activations import LeakyReLU #, PReLU
 
-def buildNetwork(input_shape:int):
+def buildNetwork(input_shape:int, encoding_dim_ae:int=2):
     input_img = Input(shape=(input_shape,))
     encoded = input_img
-    encoding_dim_ae = 2
     # encoded = Dense( encoding_dim_ae, activation='relu' )(encoded)
 
     # hidden layer
