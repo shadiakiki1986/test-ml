@@ -56,7 +56,7 @@ def buildNetwork(input_shape:int, encoding_dim_ae:int=2):
     
     return (autoencoder, encoder)
 
-def buildNetwork2_deep(input_shape:int, enc_dim1:int, enc_dim2:int):
+def buildNetwork2_deep(input_shape:int, enc_dim1:int, enc_dim2:int=None, enc_dim3:int=None, enc_dim4:int=None):
     input_img = Input(shape=(input_shape,))
     encoded = input_img
     # encoded = Dense( encoding_dim_ae, activation='relu' )(encoded)
@@ -69,12 +69,18 @@ def buildNetwork2_deep(input_shape:int, enc_dim1:int, enc_dim2:int):
     encoded = LeakyReLU(alpha=.3)(encoded)   # add an advanced activation
 
     # GET DEEP
-    encoded = Dense(enc_dim2, activation='linear')(encoded)
-    encoded = LeakyReLU(alpha=.3)(encoded)
-
-    # encoded = Dense(enc_dim3, activation='relu')(encoded)
-    decoded = Dense(enc_dim1, activation='relu')(encoded)
-
+    if enc_dim2 is not None:
+      encoded = Dense(enc_dim2, activation='linear')(encoded)
+      encoded = LeakyReLU(alpha=.3)(encoded)
+      if enc_dim3 is not None:
+        encoded = Dense(enc_dim3, activation='linear')(encoded)
+        encoded = LeakyReLU(alpha=.3)(encoded)
+        if enc_dim4 is not None:
+          encoded = Dense(enc_dim4, activation='linear')(encoded)
+          encoded = LeakyReLU(alpha=.3)(encoded)
+          decoded = Dense(enc_dim3, activation='relu')(encoded)
+        decoded = Dense(enc_dim2, activation='relu')(encoded)
+      decoded = Dense(enc_dim1, activation='relu')(encoded)
     decoded = Dense(input_shape, activation='sigmoid')(encoded)
 
     autoencoder = Model(input_img, decoded)
