@@ -1,6 +1,8 @@
 # test-ml
 Testing some ML.
 
+Can be viewed at [nbviewer/shadiakiki1986/test-ml](https://nbviewer.jupyter.org/github/shadiakiki1986/test-ml/)
+
 # Installation
 ```
 pew new TESTML
