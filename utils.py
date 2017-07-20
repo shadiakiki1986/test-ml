@@ -123,7 +123,9 @@ def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1):
   myPlot(X_enc)
 
   X_rec = autoencoder.predict(X_in)
-  print("AE mse = ", mse(X_in, X_rec))
+  result = mse(X_in, X_rec)
+  print("AE mse = ", result)
+  return result
 
 #####################
 # functions for t1e_pca_ae_nonlinear-2
