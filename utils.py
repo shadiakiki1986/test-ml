@@ -129,9 +129,11 @@ def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1):
   myPlot(X_enc)
 
   X_rec = autoencoder.predict(X_in)
-  result = mse(X_in, X_rec)
-  print("AE mse = ", result)
-  return result
+
+  #result = mse(X_in, X_rec)
+  #print("AE mse = ", result)
+  #return result
+  return X_rec
 
 #####################
 # functions for t1e_pca_ae_nonlinear-2
@@ -146,5 +148,6 @@ def pca_err(X, x_pca):
     #x_pca = pca.transform(X)
     lr = LinearRegression().fit(x_pca, X)
     x_est = lr.predict(x_pca)
-    print('err pca = ', mse(X, x_est))
-    return 
+    result = mse(X, x_est)
+    print('err pca = ', result)
+    return result
