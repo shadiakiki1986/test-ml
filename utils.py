@@ -57,6 +57,11 @@ def buildNetwork(input_shape:int, encoding_dim_ae:int=2):
     return (autoencoder, encoder)
 
 def buildNetwork2_deep(input_shape:int, enc_dim1:int, enc_dim2:int=None, enc_dim3:int=None, enc_dim4:int=None):
+    if enc_dim2 is None and (enc_dim3 is not None or enc_dim4 is not None):
+      raise Exception("dim2 is None but dim3 or dim4 is not None")
+    if enc_dim3 is None and enc_dim4 is not None:
+      raise Exception("dim3 is None but dim4 is not None")
+
     input_img = Input(shape=(input_shape,))
     encoded = input_img
     # encoded = Dense( encoding_dim_ae, activation='relu' )(encoded)
@@ -116,17 +121,19 @@ def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1):
     verbose = verbose
   )
 
-  # print("encoder predict")
-  X_enc = encoder.predict(X_in)
-  # print("encoded",X_enc)
-  # # X_enc_dec = decoder.predict(X_enc)
-  # # print("enc-dec",X_enc_dec)
-  # X_rec = autoencoder.predict(X_pca)
-  # print("recoded",X_rec)
+  # if not easy to visualize
+  if X_in.shape[1]<50:
+    # print("encoder predict")
+    X_enc = encoder.predict(X_in)
+    # print("encoded",X_enc)
+    # # X_enc_dec = decoder.predict(X_enc)
+    # # print("enc-dec",X_enc_dec)
+    # X_rec = autoencoder.predict(X_pca)
+    # print("recoded",X_rec)
 
-  # plot
-  # from matplotlib import pyplot as plt
-  myPlot(X_enc)
+    # plot
+    # from matplotlib import pyplot as plt
+    myPlot(X_enc)
 
   X_rec = autoencoder.predict(X_in)
 
