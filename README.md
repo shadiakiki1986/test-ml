@@ -12,3 +12,4 @@ jupyter notebook
 
 # Files
 1. [t1-AE-PCA](t1-AE-PCA/README.md): Autoencoders and PCA
+2. [t2-LSTM](t2-LSTM): LSTM
