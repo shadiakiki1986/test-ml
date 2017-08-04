@@ -103,7 +103,7 @@ def buildNetwork2_deep(input_shape:int, enc_dim1:int, enc_dim2:int=None, enc_dim
     return (autoencoder, encoder)
 
 from sklearn.model_selection import train_test_split
-def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1):
+def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1, callbacks:list=[]):
   # split
   X_train, X_test = train_test_split(X_in, train_size=0.8, random_state=8888)
 
@@ -118,7 +118,8 @@ def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1):
       X_test,
       X_test,
     ),
-    verbose = verbose
+    verbose = verbose,
+    callbacks=callbacks
   )
 
   # if not easy to visualize
