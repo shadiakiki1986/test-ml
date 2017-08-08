@@ -83,6 +83,7 @@ def build_lstm_vanilla(in_neurons:int, out_neurons:int, lstm_dim:int, enc_dim:in
 # Edit: the predicted signal is also a cleaned version (without the noise)
 #       The MSE in this case should be computed wrt the clean signal?
 #
+from keras.initializers import Identity
 def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:int):
   out_neurons = in_neurons
   model = Sequential()
@@ -97,7 +98,12 @@ def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:int):
   # Ref: https://stackoverflow.com/questions/40331510/how-to-stack-multiple-lstm-in-keras
   #      https://keras.io/getting-started/sequential-model-guide/
   if enc_dim is not None:
-    model.add(LSTM(enc_dim, return_sequences=False, activation='tanh'))
+    model.add(LSTM(
+      enc_dim, return_sequences=False, activation='tanh'#,
+      # https://stackoverflow.com/questions/40708169/how-to-initialize-biases-in-a-keras-model
+      #bias_initializer='zeros',
+      #kernel_initializer = Identity()
+    ))
 
   # Sequence-to-sequence autoencoder
   # https://blog.keras.io/building-autoencoders-in-keras.html
