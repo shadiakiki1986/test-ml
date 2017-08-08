@@ -90,8 +90,8 @@ def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:int):
 
   # combined from Simple_LSTM_keras_2 and LSTM book, chap 9, seq2seq
   model.add(LSTM(
-    lstm_dim, return_sequences=False if enc_dim is None else True, input_shape=(None, in_neurons), activation='tanh',
-    dropout=0.25
+    lstm_dim, return_sequences=False if enc_dim is None else True, input_shape=(None, in_neurons), activation='tanh'#,
+    #dropout=0.25
   ))
 
   # stacked LSTM for depth
@@ -113,7 +113,7 @@ def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:int):
   # not sure where I got this from, but it allows to get multiple features with lags between them
   model.add(TimeDistributed(Dense(out_neurons, activation='linear')))
 
-  model.compile(loss="mean_squared_error", optimizer="rmsprop")
+  model.compile(loss="mean_squared_error", optimizer="nadam")
 
   model.summary()
   return model
