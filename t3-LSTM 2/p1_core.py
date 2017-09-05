@@ -32,53 +32,32 @@ from keras.models import Model
 from keras.models import Sequential
 from keras.layers.core import Dense
 
-# simulated data (copy from p5g)
-# nb_samples = int(1e3)
-def data(nb_samples:int):
-  if nb_samples<=0: raise Exception("nb_samples <= 0")
-
-  lags = [1, 2]
-  X1 = pd.Series(np.random.randn(nb_samples))
-  X2 = pd.Series(np.random.randn(nb_samples))
-  # https://stackoverflow.com/a/20410720/4126114
-  X_model = pd.concat({'main': X1, 'lagged 1': X1.shift(lags[0]), 'lagged 2': X1.shift(lags[1]), 'new': X2}, axis=1).dropna()
-                       
-  X_model['mult'] = X_model.apply(lambda row: row[2]*row[3], axis=1)
-  
-  
-  # Y = X_model.apply(lambda row: 0.25*row[0] + 0.25*row[1] + 0.25*row[2] + 0.25*row[3], axis=1)
-  
-  Y = X_model.apply(lambda row: 0.2*row['main'] + 0.2*row['lagged 1'] + 0.2*row['lagged 2'] + 0.2*row['new'] + 0.2*row['mult'], axis=1)
-  Y = Y.reshape((Y.shape[0],1))
-
-  # drop columns in X_model that LSTM is supposed to figure out
-  del X_model['lagged 1']
-  del X_model['lagged 2']
-  del X_model['mult']
-
-  return (X_model, Y, lags)
 
 # copy from g2-ml/take2/ex5-lstm/p4c4.ipynb
 # lstm_dim = 30
 #  in_neurons = X_model.shape[1]
-def model(in_neurons:int, lstm_dim:list):  
+def model(in_neurons:int, lstm_dim:list, look_back:int):
   if len(lstm_dim)==0: raise Exception("len(lstm_dim) == 0")
 
   optimizer='adam'
-  
+  out_neurons = 1
+ 
   model = Sequential()
   for i, dimx in enumerate(lstm_dim):
+    print(i, dimx, len(lstm_dim))
     if i==0:
       # return sequences: for multi-stack, all True except last should be False
       model.add(LSTM(dimx, return_sequences=len(lstm_dim)!=1, input_shape=(None, in_neurons), activation='tanh'))#, dropout=0.25))
     else:
-      model.add(LSTM(dimx, return_sequences=i!=(len(lstm_dim)-1), activation='tanh'))
-  out_neurons = 1
+      model.add(LSTM(dimx, return_sequences=(i+1)!=len(lstm_dim), activation='tanh'))
+
   model.add(Dense(out_neurons, activation='linear'))
   
   model.compile(loss="mean_squared_error", optimizer=optimizer) # nadam
 
   return model
+
+from keras.layers import RepeatVector, TimeDistributed, Input
 
 #  epochs = 300
 #  look_back = 5
@@ -95,7 +74,7 @@ def fit(X_model:pd.DataFrame, Y, lags:list, model, epochs:int, look_back:int):
       x=X_calib,
       y=Y_calib,
       epochs = epochs,
-      verbose = 0, #2,
+      verbose = 2,
       batch_size = 1000, # 100
       validation_split = 0.2,
       shuffle=False
@@ -106,3 +85,30 @@ def fit(X_model:pd.DataFrame, Y, lags:list, model, epochs:int, look_back:int):
   err = utils.mse(Y_calib, pred)
 
   return (history, err)
+
+
+# -----------------------------
+# copy from g2-ml/take2/ex5-lstm/p4c4.ipynb
+# lstm_dim = 30
+#  in_neurons = X_model.shape[1]
+def model_2(in_neurons:int, lstm_dim:list, look_back:int):
+  if len(lstm_dim)==0: raise Exception("len(lstm_dim) == 0")
+
+  optimizer='adam'
+  out_neurons = 1
+ 
+  model = Sequential()
+  for i, dimx in enumerate(lstm_dim):
+    print(i, dimx, len(lstm_dim))
+    if i==0:
+      # return sequences: for multi-stack, all True except last should be False
+      model.add(LSTM(dimx, return_sequences=False, input_shape=(None, in_neurons), activation='tanh'))#, dropout=0.25))
+    else:
+      model.add(Dense(dimx, activation='tanh'))
+
+  model.add(Dense(out_neurons, activation='linear'))
+  
+  model.compile(loss="mean_squared_error", optimizer=optimizer) # nadam
+
+  return model
+

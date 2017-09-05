@@ -152,7 +152,10 @@ def ae_fit_encode_plot_mse(X_in, autoencoder, encoder, N_epochs, verbose=1, call
 # functions for t1e_pca_ae_nonlinear-2
 # copied from https://stats.stackexchange.com/questions/190148/autoencoder-pca-tensorflow?rq=1
 def mse(x, x_est):
-    return np.linalg.norm(x - x_est)/np.linalg.norm(x)
+    numerator = np.linalg.norm(x - x_est)
+    denominator = np.linalg.norm(x)
+    print('num/deonm', numerator, denominator, numerator/denominator)
+    return numerator/denominator
 
 from sklearn.linear_model import LinearRegression
 def pca_err(X, x_pca):
