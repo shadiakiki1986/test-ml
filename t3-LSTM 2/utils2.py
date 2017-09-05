@@ -84,8 +84,9 @@ def build_lstm_vanilla(in_neurons:int, out_neurons:int, lstm_dim:int, enc_dim:in
 #       The MSE in this case should be computed wrt the clean signal?
 #
 from keras.initializers import Identity
-def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:list=None, optimizer='nadam'):
-  out_neurons = in_neurons
+def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:list=None, optimizer='nadam', out_neurons:int=None):
+  if out_neurons is None: out_neurons=in_neurons
+
   model = Sequential()
 
   # combined from Simple_LSTM_keras_2 and LSTM book, chap 9, seq2seq
@@ -116,7 +117,7 @@ def build_lstm_ae(in_neurons:int, lstm_dim:int, look_back:int, enc_dim:list=None
   # not sure where I got this from, but it allows to get multiple features with lags between them
   model.add(TimeDistributed(Dense(out_neurons, activation='linear')))
 
-  model.compile(loss="mean_squared_error", optimizer="nadam")
+  model.compile(loss="mean_squared_error", optimizer=optimizer)
 
   model.summary()
   return model
