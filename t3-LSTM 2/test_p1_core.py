@@ -1,29 +1,50 @@
 # Deps
-# pip install unittest-data-provider
+# sudo apt-get install python3-tk
+# pip install nose
 #
 # Run all
-# python -m unittest -q test_p1_core
+# nosetests --logging-level INFO test_p1_core.py
 #
 # Run a single test class with unittest
 # http://pythontesting.net/framework/specify-test-unittest-nosetests-pytest/
-# python -m unittest -q test_p1_core.P1CoreCase.test_fit_model_1
-# python -m unittest -q test_p1_core.P1CoreCase.test_fit_model_2
+# https://nose.readthedocs.io/en/latest/plugins/logcapture.html
+# nosetests --logging-level INFO --nocapture test_p1_core.py:TestP1Core.test_fit_model_1
+# nosetests --logging-level INFO --nocapture test_p1_core.py:TestP1Core.test_fit_model_2
 
 
 import unittest
 from unittest_data_provider import data_provider
 import p1_core
+import utils
 import utils2
 
 import numpy as np
 import pandas as pd
+import utils3
+from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+from keras import backend as K # copy from ~/.local/share/virtualenvs/G2ML/lib/python3.5/site-packages/keras/callbacks.py
+from hashlib import md5
 
-class P1CoreCase(unittest.TestCase):
+from keras.models import load_model
+from os import path, makedirs
+import nose
 
+class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/questions/6689537/nose-test-generators-inside-class#comment46280717_11093309
+
+  #-------------------------
+  # save model in file: filename is md5 checksum of models file
+  # This way, any edits in the file result in a new filename and hence re-calculating the model
+  def setUp(self):
+    with open("p1_core.py",'rb') as f:
+      self._model_path = path.join("/tmp", md5(f.read()).hexdigest())
+      print("model path: ", self._model_path)
+
+  #-------------------------
   # simulated data (copy from p5g)
   # nb_samples = int(1e3)
-  def data(self,nb_samples:int):
+  def _data(self,nb_samples:int):
     if nb_samples<=0: raise Exception("nb_samples <= 0")
+    np.random.seed(0) # https://stackoverflow.com/a/34306306/4126114
 
     lags = [1, 2]
     X1 = pd.Series(np.random.randn(nb_samples))
@@ -47,47 +68,131 @@ class P1CoreCase(unittest.TestCase):
     return (X_model, Y, lags)
 
   #-------------------------
-  # https://stackoverflow.com/questions/18905637/python-unittest-data-provider#18906125
-  params = lambda: (
-    # (int(10e3),  600, 0.0196, [10]),
-    # (int(10e3),  600, 0.0147, [10,10]),
-    # (int(10e3),  600, 0.0173, [10,10,10]),
-    # (int(10e3),  600, 0.0528, [10,10,10,10]),
-    # (int(10e3),  600, 0.0093, [30]),
-    # (int(10e3),  600, 0.0097, [60]),
-    # (int(10e3),  600, 0.0061, [90]),
-    # (int(10e3),  600, 0.0146, [30,10]),
-    # (int(10e3),  600, 0.0082, [30,30]),
-    # (int(10e3),  600, 0.0085, [30,60]),
-    # (int(10e3),  600, 0.0079, [60,30]),
-    # (int(10e3),  600, 0.0192, [60,60]),
-    # (int(10e3),  600, 0.0054, [90,60]),
-    # (int(10e3),  600, 0.0086, [90,60,30]),
+  # get initial epoch
+  def _get_initial_epoch(self,tb_log_dir):
+    if not path.exists(tb_log_dir):
+        print("tensorboard history not found: %s"%(tb_log_dir))
+        return 0
 
-    # tests with less epochs
-    # (int(10e3),  400, 0.01, [90,60,30]),
-    # (int(10e3),  400, 0.01, [30,30]),
-    # (int(10e3),  300, 0.0129, [60,30]),
+    print("tensorboard history found: %s"%(tb_log_dir))
+    latest = utils3.load_tensorboard_latest_data(tb_log_dir)
+    if latest is None:
+        print("tensorboard history is empty")
+        return 0
 
-    # failed tests
-    # stuck since epoch 400 # (int(10e3), 1000, 0.01, [30,20,10]),
+    initial_epoch = latest['step']+1 # 0-based
+    print(
+        "found history on trained model: epochs: %i, loss: %s, val_loss: %s" %
+        (initial_epoch, latest['loss'], latest['val_loss'])
+    )
 
-    # tests with less data
-    # (int( 1e3), 3000, 0.01, [30]),
-    # (int( 1e3), 2100, 0.01, [60]),
-    # (int( 1e3), 4000, 0.01, [30, 20, 10]),
+    return initial_epoch
+
+  #-------------------------
+  #  epochs = 300
+  #  look_back = 5
+  def _fit(self, X_model:pd.DataFrame, Y, lags:list, model, epochs:int, look_back:int, model_file:str, keras_file:str):
+    if epochs<=0: raise Exception("epochs <= 0")
+
+    if look_back < max(lags):
+        raise Exception("Not enough look back provided")
+    X_calib = utils3._load_data_strides(X_model.values, look_back)
+    
+    Y_calib = Y[(look_back-1):]
+
+
+    # callbacks
+    early_stopping = EarlyStopping(monitor='val_loss',
+                               patience=100)
+    checkpointer = ModelCheckpoint(filepath=keras_file,
+                               verbose=0, #2
+                               save_best_only=True)
+    # https://stackoverflow.com/a/43549608/4126114
+    tb_log_dir = path.join(model_file, 'tb')
+    tensorboard = TensorBoard(log_dir=tb_log_dir,
+                     histogram_freq=10,
+                     write_graph=True,
+                     write_images=False)
+
+      
+    history = model.fit(
+        x=X_calib,
+        y=Y_calib,
+        epochs = epochs,
+        verbose = 0,#2,
+        batch_size = 1000, # 100
+        validation_split = 0.2,
+        callbacks = [early_stopping, checkpointer, tensorboard],
+        initial_epoch = self._get_initial_epoch(tb_log_dir),
+        shuffle=False
+    )
+    
+    pred = model.predict(x=X_calib, verbose = 0)
+
+    # reset tensorflow session
+    # https://stackoverflow.com/questions/43975090/tensorflow-close-session-on-object-destruction
+    # found in /home/ubuntu/.local/share/virtualenvs/G2ML/lib/python3.5/site-packages/keras/backend/tensorflow_backend.py 
+    K.clear_session()
+    
+    err = utils.mse(Y_calib, pred)
+
+    return (history, err)
+
+  #-------------------------
+  params = (
+    (int(10e3),  600, 0.0241, [10]),
+    (int(10e3),  600, 0.0147, [10,10]),
+    (int(10e3),  600, 0.0173, [10,10,10]),
+    (int(10e3),  600, 0.0528, [10,10,10,10]),
+    (int(10e3),  600, 0.0093, [30]),
+    (int(10e3),  600, 0.0097, [60]),
+    (int(10e3),  600, 0.0061, [90]),
+    (int(10e3),  600, 0.0146, [30,10]),
+    (int(10e3),  600, 0.0082, [30,30]),
+    (int(10e3),  600, 0.0085, [30,60]),
+    (int(10e3),  600, 0.0079, [60,30]),
+    (int(10e3),  600, 0.0192, [60,60]),
+    (int(10e3),  600, 0.0054, [90,60]),
+    (int(10e3),  600, 0.0086, [90,60,30]),
+
+#    # tests with less epochs
+#    (int(10e3),  400, 0.01, [90,60,30]),
+#    (int(10e3),  400, 0.01, [30,30]),
+#    (int(10e3),  300, 0.0129, [60,30]),
+#
+#    # failed tests
+#    # stuck since epoch 400 # (int(10e3), 1000, 0.01, [30,20,10]),
+#
+#    # tests with less data
+#    (int( 1e3), 3000, 0.01, [30]),
+#    (int( 1e3), 2100, 0.01, [60]),
+#    (int( 1e3), 4000, 0.01, [30, 20, 10]),
+
+#    # testing tests
+#    (int( 1e3), 30, 0.6153, [30]),
+#    (int( 1e3), 20, 0.7024, [60]),
+
   )
 
   #-------------------------
-  @data_provider(params)
-  def test_fit_model_1(self, nb_samples, epochs, expected_mse, lstm_dim):
-    (X_model, Y, lags) = self.data(nb_samples)
+  # http://nose.readthedocs.io/en/latest/writing_tests.html#test-generators
+  def test_fit_model_1(self):
+    for nb_samples, epochs, expected_mse, lstm_dim in self.params:
+      yield self.check_fit_model_1, nb_samples, epochs, expected_mse, lstm_dim
+
+  def check_fit_model_1(self, nb_samples, epochs, expected_mse, lstm_dim):
+    model_desc = "model_1: nb %s, epochs %s, dim %s"%(nb_samples, epochs, lstm_dim)
+    print(model_desc)
+    print("model_1: mse %s"%(expected_mse))
+
+    (X_model, Y, lags) = self._data(nb_samples)
 
     look_back = 5
-    model = p1_core.model(X_model.shape[1], lstm_dim, look_back)
+    model, model_file, keras_file = self._model(lambda: p1_core.model(X_model.shape[1], lstm_dim, look_back), model_desc)
+
     # model = utils2.build_lstm_ae(X_model.shape[1], lstm_dim[0], look_back, lstm_dim[1:], "adam", 1)
-    model.summary()
-    (history, err) = p1_core.fit(X_model, Y, lags, model, epochs, look_back)
+    # model.summary()
+    (history, err) = self._fit(X_model, Y, lags, model, epochs, look_back, model_file, keras_file)
 
     # with 10e3 points
     #      np.linalg.norm of data = 45
@@ -98,26 +203,45 @@ class P1CoreCase(unittest.TestCase):
     #      np.linalg.norm of data = 14
     #      and a desired mse <= 0.01
     # The minimum loss required = (14 * 0.01)**2 / 1e3 ~ 2e-5 (also)
-    self.assertLess(err, expected_mse)
+    nose.tools.assert_almost_equal(err, expected_mse, places=4)
+
+  #--------------------
+  # model_desc: should be unique to the model function call
+  def _model(self,callback,model_desc):
+    model_file = md5(model_desc.encode('utf-8')).hexdigest()
+    model_file = path.join(self._model_path, model_file)
+    print("model file", model_file)
+
+    # create folders in model_file
+    makedirs(model_file, exist_ok=True)
+
+    # proceed
+    keras_file = path.join(model_file, 'keras')
+    print("keras file", keras_file)
+    if not path.exists(keras_file):
+      print("launch new model")
+      return callback(), model_file, keras_file
+
+    print("load pre-trained model")
+    model = load_model(keras_file)
+    # model.summary()
+    return model, model_file, keras_file
 
   #-------------------------
-  @data_provider(params)
-  def test_fit_model_2(self, nb_samples, epochs, expected_mse, lstm_dim):
-    (X_model, Y, lags) = self.data(nb_samples)
+  def test_fit_model_2(self):
+    for (nb_samples, epochs, expected_mse, lstm_dim) in self.params:
+      yield self.check_fit_model_2, nb_samples, epochs, expected_mse, lstm_dim
+      #self.check_fit_model_2( nb_samples, epochs, expected_mse, lstm_dim )
+
+  def check_fit_model_2(self, nb_samples, epochs, expected_mse, lstm_dim):
+    model_desc = "model 2: nb %s, epochs %s, mse %s, dim %s"%(nb_samples, epochs, expected_mse, lstm_dim)
+    print(model_desc)
+    print("model 2: mse %s"%(expected_mse))
+    (X_model, Y, lags) = self._data(nb_samples)
 
     look_back = 5
-    model = p1_core.model_2(X_model.shape[1], lstm_dim, look_back)
-    # model = utils2.build_lstm_ae(X_model.shape[1], lstm_dim[0], look_back, lstm_dim[1:], "adam", 1)
-    model.summary()
-    (history, err) = p1_core.fit(X_model, Y, lags, model, epochs, look_back)
+    model, model_file, keras_file = self._model(lambda: p1_core.model_2(X_model.shape[1], lstm_dim, look_back), model_desc)
+    # model.summary()
+    (history, err) = self._fit(X_model, Y, lags, model, epochs, look_back, model_file, keras_file)
 
-    # with 10e3 points
-    #      np.linalg.norm of data = 45
-    #      and a desired mse <= 0.01
-    # The minimum loss required = (45 * 0.01)**2 / 10e3 ~ 2e-5
-    #
-    # with 1e3 points
-    #      np.linalg.norm of data = 14
-    #      and a desired mse <= 0.01
-    # The minimum loss required = (14 * 0.01)**2 / 1e3 ~ 2e-5 (also)
-    self.assertLess(err, expected_mse)
+    nose.tools.assert_almost_equal(err, expected_mse, places=4)

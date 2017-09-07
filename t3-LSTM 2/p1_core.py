@@ -5,22 +5,9 @@ import numpy as np
 from keras.models import Sequential
 from keras.layers.core import Dense, Dropout
 from keras.layers.recurrent import SimpleRNN, LSTM, GRU
-from keras.callbacks import Callback, EarlyStopping, ModelCheckpoint
 import keras
-import utils
-import utils2
 
 import pandas as pd
-
-#-----------------------------------
-# copy from utils3.py
-
-# stride the data
-from skimage.util.shape import view_as_windows # pip install scikit-image
-def _load_data_strides(A, n_prev):
-    out = view_as_windows(A,window_shape=(n_prev,A.shape[1]),step=1)
-    out = out.reshape((out.shape[0],out.shape[2],out.shape[3])) # for some reason need to drop extra dim=1
-    return out
 
 #-----------------------------------
 from keras.models import load_model
@@ -59,32 +46,6 @@ def model(in_neurons:int, lstm_dim:list, look_back:int):
 
 from keras.layers import RepeatVector, TimeDistributed, Input
 
-#  epochs = 300
-#  look_back = 5
-def fit(X_model:pd.DataFrame, Y, lags:list, model, epochs:int, look_back:int):
-  if epochs<=0: raise Exception("epochs <= 0")
-
-  if look_back < max(lags):
-      raise Exception("Not enough look back provided")
-  X_calib = _load_data_strides(X_model.values, look_back)
-  
-  Y_calib = Y[(look_back-1):]
-    
-  history = model.fit(
-      x=X_calib,
-      y=Y_calib,
-      epochs = epochs,
-      verbose = 2,
-      batch_size = 1000, # 100
-      validation_split = 0.2,
-      shuffle=False
-  )
-  
-  pred = model.predict(x=X_calib, verbose = 0)
-  
-  err = utils.mse(Y_calib, pred)
-
-  return (history, err)
 
 
 # -----------------------------
