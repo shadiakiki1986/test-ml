@@ -8,8 +8,8 @@
 # Run a single test class with unittest
 # http://pythontesting.net/framework/specify-test-unittest-nosetests-pytest/
 # https://nose.readthedocs.io/en/latest/plugins/logcapture.html
-# nosetests --logging-level INFO --nocapture test_p1_core.py:TestP1Core.test_fit_model_1
-# nosetests --logging-level INFO --nocapture test_p1_core.py:TestP1Core.test_fit_model_2
+# nosetests --logging-level INFO --nocapture -v test_p1_core.py:TestP1Core.test_fit_model_1
+# nosetests --logging-level INFO --nocapture -v test_p1_core.py:TestP1Core.test_fit_model_2
 
 
 import unittest
@@ -28,6 +28,18 @@ from hashlib import md5
 from keras.models import load_model
 from os import path, makedirs
 import nose
+import json
+
+# https://stackoverflow.com/a/22721724/4126114
+from collections import OrderedDict
+def sortOD(od):
+  res = OrderedDict()
+  for k, v in sorted(od.items()):
+    if isinstance(v, dict):
+      res[k] = sortOD(v)
+    else:
+      res[k] = v
+  return res
 
 class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/questions/6689537/nose-test-generators-inside-class#comment46280717_11093309
 
@@ -35,9 +47,7 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
   # save model in file: filename is md5 checksum of models file
   # This way, any edits in the file result in a new filename and hence re-calculating the model
   def setUp(self):
-    with open("p1_core.py",'rb') as f:
-      self._model_path = path.join("/tmp", md5(f.read()).hexdigest())
-      print("model path: ", self._model_path)
+    self._model_path = path.join("/", "tmp", "test-ml-cache")
 
   #-------------------------
   # simulated data (copy from p5g)
@@ -147,14 +157,14 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     (int(10e3),  600, 0.0093, [30]),
     (int(10e3),  600, 0.0097, [60]),
     (int(10e3),  600, 0.0061, [90]),
-    (int(10e3),  600, 0.0146, [30,10]),
-    (int(10e3),  600, 0.0082, [30,30]),
-    (int(10e3),  600, 0.0085, [30,60]),
-    (int(10e3),  600, 0.0079, [60,30]),
-    (int(10e3),  600, 0.0192, [60,60]),
-    (int(10e3),  600, 0.0054, [90,60]),
-    (int(10e3),  600, 0.0086, [90,60,30]),
-
+#    (int(10e3),  600, 0.0146, [30,10]),
+#    (int(10e3),  600, 0.0082, [30,30]),
+#    (int(10e3),  600, 0.0085, [30,60]),
+#    (int(10e3),  600, 0.0079, [60,30]),
+#    (int(10e3),  600, 0.0192, [60,60]),
+#    (int(10e3),  600, 0.0054, [90,60]),
+#    (int(10e3),  600, 0.0086, [90,60,30]),
+#
 #    # tests with less epochs
 #    (int(10e3),  400, 0.01, [90,60,30]),
 #    (int(10e3),  400, 0.01, [30,30]),
@@ -188,7 +198,7 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     (X_model, Y, lags) = self._data(nb_samples)
 
     look_back = 5
-    model, model_file, keras_file = self._model(lambda: p1_core.model(X_model.shape[1], lstm_dim, look_back), model_desc)
+    model, model_file, keras_file = self._model(lambda: p1_core.model(X_model.shape[1], lstm_dim, look_back))
 
     # model = utils2.build_lstm_ae(X_model.shape[1], lstm_dim[0], look_back, lstm_dim[1:], "adam", 1)
     # model.summary()
@@ -206,9 +216,11 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     nose.tools.assert_almost_equal(err, expected_mse, places=4)
 
   #--------------------
-  # model_desc: should be unique to the model function call
-  def _model(self,callback,model_desc):
-    model_file = md5(model_desc.encode('utf-8')).hexdigest()
+  def _model(self,callback):
+    model = callback()
+    model_file = [sortOD(x) for x in model.get_config()]
+    model_file = json.dumps(model_file).encode('utf-8')
+    model_file = md5(model_file).hexdigest()
     model_file = path.join(self._model_path, model_file)
     print("model file", model_file)
 
@@ -220,7 +232,7 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     print("keras file", keras_file)
     if not path.exists(keras_file):
       print("launch new model")
-      return callback(), model_file, keras_file
+      return model, model_file, keras_file
 
     print("load pre-trained model")
     model = load_model(keras_file)
@@ -240,7 +252,7 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     (X_model, Y, lags) = self._data(nb_samples)
 
     look_back = 5
-    model, model_file, keras_file = self._model(lambda: p1_core.model_2(X_model.shape[1], lstm_dim, look_back), model_desc)
+    model, model_file, keras_file = self._model(lambda: p1_core.model_2(X_model.shape[1], lstm_dim, look_back))
     # model.summary()
     (history, err) = self._fit(X_model, Y, lags, model, epochs, look_back, model_file, keras_file)
 
