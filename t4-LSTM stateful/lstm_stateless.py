@@ -10,12 +10,15 @@ from keras.models import Sequential
 from keras.layers import Dense, LSTM
 
 
-# since we are using stateful rnn tsteps can be set to 1
-tsteps = 1
-batch_size = 25
+# since we are using stateless rnn,
+# tsteps needs to be >= lahead for the training to converge
+tsteps = 2
+
+# choosing a smaller batch size would be slower, but converges earlier (epoch-wise)
+batch_size = 100
 epochs = 25
 # number of elements ahead that are used to make the prediction
-lahead = 1
+lahead = tsteps
 
 
 def gen_cosine_amp(amp=100, period=1000, x0=0, xn=50000, step=1, k=0.0001):
@@ -39,28 +42,27 @@ def gen_cosine_amp(amp=100, period=1000, x0=0, xn=50000, step=1, k=0.0001):
 
 
 print('Generating Data...')
-cos = gen_cosine_amp()
+# cos = gen_cosine_amp()
+cos = np.random.uniform(-100, +100, (int(50e3)//lahead, lahead, 1))
 print('Input shape:', cos.shape)
 
-expected_output = np.zeros((len(cos), 1))
-for i in range(len(cos) - lahead):
-    expected_output[i, 0] = np.mean(cos[i + 1:i + lahead + 1])
+expected_output = np.mean(cos, axis=1)
 
 print('Output shape:', expected_output.shape)
 
-print('Plotting input/output')
-plt.subplot(2, 1, 1)
-plt.plot(cos.flatten())
-plt.title('Input')
-plt.subplot(2, 1, 2)
-plt.plot(expected_output)
-plt.title('Expected output')
-plt.show()
-
-print('Plotting input - output')
-plt.plot(cos.flatten() - expected_output.flatten())
-plt.title('input - output is negligible, but non-zero')
-plt.show()
+# print('Plotting input/output')
+# plt.subplot(2, 1, 1)
+# plt.plot(cos.flatten())
+# plt.title('Input')
+# plt.subplot(2, 1, 2)
+# plt.plot(expected_output)
+# plt.title('Expected output')
+# plt.show()
+# 
+# print('Plotting input - output')
+# plt.plot(cos.flatten() - expected_output.flatten())
+# plt.title('input - output is negligible, but non-zero')
+# plt.show()
 
 print('Creating Model...')
 model = Sequential()
@@ -76,31 +78,27 @@ model.add(Dense(1))
 model.compile(loss='mse', optimizer='rmsprop')
 
 print('Training')
-for i in range(epochs):
-    print('Epoch', i, '/', epochs)
+model.fit(cos, expected_output,
+      batch_size=batch_size,
+      epochs=epochs,
+      verbose=1,
+      shuffle=False)
 
-    # Note that the last state for sample i in a batch will
-    # be used as initial state for sample i in the next batch.
-    # Thus we are simultaneously training on batch_size series with
-    # lower resolution than the original series contained in cos.
-    # Each of these series are offset by one step and can be
-    # extracted with cos[i::batch_size].
+print('Evaluating on new data')
+cos = np.random.uniform(-100, +100, (int(50e3)//lahead, lahead, 1))
+expected_output = np.mean(cos, axis=1)
+print(cos.shape, expected_output.shape, batch_size)
+score = model.evaluate(cos, expected_output, batch_size=batch_size, verbose=2)
+print('score', score)
 
-    model.fit(cos, expected_output,
-              batch_size=batch_size,
-              epochs=1,
-              verbose=1,
-              shuffle=False)
-    model.reset_states()
-
-print('Predicting')
-predicted_output = model.predict(cos, batch_size=batch_size)
-
-print('Plotting Results')
-plt.subplot(2, 1, 1)
-plt.plot(expected_output)
-plt.title('Expected')
-plt.subplot(2, 1, 2)
-plt.plot(predicted_output)
-plt.title('Predicted')
-plt.show()
+# print('Predicting')
+# predicted_output = model.predict(cos, batch_size=batch_size)
+# 
+# print('Plotting Results')
+# plt.subplot(2, 1, 1)
+# plt.plot(expected_output)
+# plt.title('Expected')
+# plt.subplot(2, 1, 2)
+# plt.plot(predicted_output)
+# plt.title('Predicted')
+# plt.show()

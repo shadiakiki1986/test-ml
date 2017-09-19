@@ -216,6 +216,7 @@ class TestP1Core(object): #unittest.TestCase): # https://stackoverflow.com/quest
     nose.tools.assert_almost_equal(err, expected_mse, places=4)
 
   #--------------------
+  # callback: lambda function without any parameters and returning a keras model
   def _model(self,callback):
     model = callback()
     model_file = [sortOD(x) for x in model.get_config()]
